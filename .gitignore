@@ -1,0 +1,7 @@
+target/
+tools/*
+!tools/README.md
+build/
+.DS_Store
+*.log
+natives/src/main/resources/natives/
