@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Optional version to build the dry-run bundle as (not committed)
+        description: Optional version to build the dry-run bundle as (not committed; defaults to the pom version without -SNAPSHOT)
         required: false
         type: string
 
@@ -126,8 +126,17 @@ jobs:
       - name: Build Central bundle without publishing
         run: |
           ./mvnw -v
-          if [[ -n "$DRY_RUN_VERSION" ]]; then
-            ./mvnw -B -q versions:set -DnewVersion="$DRY_RUN_VERSION" -DgenerateBackupPoms=false
+          # Snapshot deploys go straight to Central's snapshot repository and
+          # ignore centralBaseUrl, so always build the bundle as a release.
+          if [[ -z "$DRY_RUN_VERSION" ]]; then
+            DRY_RUN_VERSION="$(./mvnw -q help:evaluate -Dexpression=project.version -DforceStdout)"
+            DRY_RUN_VERSION="${DRY_RUN_VERSION%-SNAPSHOT}"
+          fi
+          ./mvnw -B -q versions:set -DnewVersion="$DRY_RUN_VERSION" -DgenerateBackupPoms=false
+          VERSION="$(./mvnw -q help:evaluate -Dexpression=project.version -DforceStdout)"
+          if [[ "$VERSION" == *-SNAPSHOT ]]; then
+            echo "::error::Refusing to dry-run snapshot version $VERSION"
+            exit 1
           fi
           # skipPublishing would also skip bundling, so let the upload fail
           # against an unreachable URL instead and keep the bundle it built.
